@@ -15,6 +15,7 @@ def addName(name):
             print("failed to grab frame")
             break
 
+        cv2.imshow("Press SPACE to take a picture", frame)
         k = cv2.waitKey(1)
         if k % 256 == 32:
             # SPACE pressed
@@ -23,5 +24,4 @@ def addName(name):
             cv2.imwrite(img_path, frame)
             print("{} written!".format(img_path))
             img_counter += 1
-
-    cam.release()
+    cv2.destroyAllWindows()

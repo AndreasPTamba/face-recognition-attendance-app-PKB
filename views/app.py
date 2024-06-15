@@ -5,8 +5,10 @@ import PIL.Image, PIL.ImageTk  # Required for image processing with OpenCV and T
 import mysql.connector
 from tkinter import *
 from tkinter import ttk
+from tkinter import messagebox
 from dotenv import load_dotenv
 import os
+from controllers.VideoCapture import addName
 
 class MyApp:
     def __init__(self, root):
@@ -36,25 +38,27 @@ class MyApp:
         self.frame1 = tk.Canvas(root, bg="#FF0000", width=frame1_width, height=frame1_height)
         self.frame1.place(x=self.padx, y=(self.pady))
         
-        button1 = tk.Button(root, text="Admin", width=30, height=2)
+        button1 = tk.Button(root, text="Add Student", width=30, height=2, command=lambda: self.add_student())
         button1.place(x=(15 * self.padx), y=(1 * self.pady))
         
-        button2 = tk.Button(root, text="Admin 2", width=30, height=2, command=lambda: self.view_record())
+        button2 = tk.Button(root, text="View Record", width=30, height=2, command=lambda: self.view_record())
         button2.place(x=(15 * self.padx), y=(3 * self.pady))
         
-        button3 = tk.Button(root, text="Admin", width=30, height=2)
-        button3.place(x=(15 * self.padx), y=(5 * self.pady))
+        # button3 = tk.Button(root, text="Admin", width=30, height=2)
+        # button3.place(x=(15 * self.padx), y=(5 * self.pady))
         
-        # Initialize OpenCV video capture
-        self.cap = cv2.VideoCapture(0)  # Assuming the default camera (index 0)
+        self.cap = cv2.VideoCapture(0)  # Open the camera
 
         # Update canvas with video feed
         self.update_camera()
+
+        # Load environment variables
         load_dotenv()
+
+        # Connect to MySQL database
         self.connect_to_db()
         
     def update_camera(self):
-        
         ret, frame = self.cap.read()  # Read frame from the camera
 
         if ret:
@@ -148,7 +152,146 @@ class MyApp:
             return None
         
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = MyApp(root)
-    root.mainloop()
+    def add_student(self):
+        # Fungsi untuk menambahkan data mahasiswa ke database
+
+        # Hentikan pembaruan kamera
+        self.root.after_cancel(self.update_camera)
+        
+        # Buat jendela tambahan
+        self.add_student_window = tk.Toplevel(self.root)
+        self.add_student_window.title("Add Student")
+        
+        # Tentukan ukuran dan posisi jendela tambahan
+         # Mendapatkan ukuran layar
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+
+        # Menentukan ukuran dan posisi jendela
+        window_width = ((screen_width // 5) * 4)
+        window_height = ((screen_height // 5) * 4)
+        
+        x_position = (screen_width // 2) - (window_width // 2)
+        y_position = (screen_height // 2) - (window_height // 2) - 20
+        
+        self.add_student_window.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
+        
+        # Sembunyikan jendela utama
+        self.root.withdraw()
+        self.cap.release()
+
+        # Buat label dan entry untuk NIM
+        label_nim = tk.Label(self.add_student_window, text="NIM")
+        label_nim.place(x=20, y=20)
+        self.entry_nim = tk.Entry(self.add_student_window)
+        self.entry_nim.place(x=150, y=20)
+        
+        # Buat label dan entry untuk nama
+        label_name = tk.Label(self.add_student_window, text="Name")
+        label_name.place(x=20, y=60)
+        self.entry_name = tk.Entry(self.add_student_window)
+        self.entry_name.place(x=150, y=60)
+
+        # Buat label dan entry untuk gender
+        label_gender = tk.Label(self.add_student_window, text="Gender")
+        label_gender.place(x=20, y=100)
+        self.selected_option = tk.StringVar()
+        options = ["Male", "Female"]
+        self.entry_gender = ttk.OptionMenu(self.add_student_window, self.selected_option, options[0], *options)
+        self.entry_gender.place(x=150, y=100)
+
+        # Buat label dan entry untuk address
+        label_address = tk.Label(self.add_student_window, text="Address")
+        label_address.place(x=20, y=140)
+        self.entry_address = tk.Entry(self.add_student_window)
+        self.entry_address.place(x=150, y=140)
+
+        # Buat label dan entry untuk phone number
+        label_phone = tk.Label(self.add_student_window, text="Phone")
+        label_phone.place(x=20, y=180)
+        self.entry_phone = tk.Entry(self.add_student_window)
+        self.entry_phone.place(x=150, y=180)
+
+        # Buat label dan entry untuk email
+        label_email = tk.Label(self.add_student_window, text="Email")
+        label_email.place(x=20, y=220)
+        self.entry_email = tk.Entry(self.add_student_window)
+        self.entry_email.place(x=150, y=220)
+        
+        # Buat tombol untuk membatalkan penambahan data
+        button_cancel = tk.Button(self.add_student_window, text="Cancel", command=lambda: self.cancel_add_student())
+        button_cancel.place(x=50, y=260)
+        # Buat tombol untuk menyimpan data
+        button_save = tk.Button(self.add_student_window, text="Save", command=lambda: self.run_add_student_images())
+        button_save.place(x=150, y=260)
+    
+    def save_student(self):
+        # Fungsi untuk menyimpan data mahasiswa ke database
+        db_connection = self.connect_to_db()
+        if db_connection:
+            cursor = db_connection.cursor()
+
+            try:
+                # Ambil data dari entry
+                nim = self.entry_nim.get()
+                name = self.entry_name.get()
+                gender = self.selected_option.get()
+                address = self.entry_address.get()
+                phone = self.entry_phone.get()
+                email = self.entry_email.get()
+                data_path = './dataset/{}'.format(nim)
+
+                query = """
+                INSERT INTO mahasiswa (nim, name, gender, address, phone_number, email_address, data_path) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """
+                data = (nim, name, gender, address, phone, email, data_path)
+                cursor.execute(query, data)
+                db_connection.commit()
+                print("Data inserted successfully")
+
+            except mysql.connector.Error as error:
+                print("Failed to insert data into MySQL table:", error)
+            finally:
+                cursor.close()
+                db_connection.close()
+                print("MySQL connection is closed")
+    
+    def run_add_student_images(self):
+        nim = self.entry_nim.get()
+        db_connection = self.connect_to_db()
+        if db_connection:
+            cursor = db_connection.cursor()
+            try:
+                query = "SELECT * FROM mahasiswa WHERE nim = %s"
+                cursor.execute(query, (nim,))
+                result = cursor.fetchone()
+
+                if result:
+                    messagebox.showinfo("Warning", f"NIM {nim} exists in the database.")
+                else:
+                    addName(nim)
+                    self.cap = cv2.VideoCapture(0)
+                    self.save_student()
+                    self.add_student_window.destroy()
+                    self.root.deiconify()
+                    
+                    
+                    
+            except mysql.connector.Error as error:
+                print("Error validating NIM:", error)
+                messagebox.showerror("Error", f"Error validating NIM: {error}")
+            finally:
+                cursor.close()
+                db_connection.close()
+                print("MySQL connection is closed")
+        
+    def cancel_add_student(self):
+        # Fungsi untuk membatalkan penambahan data
+        self.add_student_window.destroy()
+        self.root.deiconify()
+        self.cap = cv2.VideoCapture(0)
+        
+        
+
+
