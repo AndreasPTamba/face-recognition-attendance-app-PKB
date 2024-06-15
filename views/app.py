@@ -5,6 +5,8 @@ import PIL.Image, PIL.ImageTk  # Required for image processing with OpenCV and T
 import mysql.connector
 from tkinter import *
 from tkinter import ttk
+from dotenv import load_dotenv
+import os
 
 class MyApp:
     def __init__(self, root):
@@ -48,7 +50,7 @@ class MyApp:
 
         # Update canvas with video feed
         self.update_camera()
-        
+        load_dotenv()
         self.connect_to_db()
         
     def update_camera(self):
@@ -116,9 +118,10 @@ class MyApp:
     def connect_to_db(self):
         try:
             connection = mysql.connector.connect(
-                host="localhost",
-                user="root",
-                database="face_recognition_attendance"
+                host=os.getenv("DB_HOST"),
+                user=os.getenv("DB_USER"),
+                password=os.getenv("DB_PASSWORD"),
+                database=os.getenv("DB_NAME")
             )
             print("Connected to MySQL database")
             return connection
