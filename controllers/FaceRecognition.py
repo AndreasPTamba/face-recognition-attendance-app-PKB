@@ -26,7 +26,7 @@ def faceRecognition():
     known_face_encodings = []
     known_face_names = []
     # Load known faces from the dataset
-    dataset_path = './dataset'  # Ganti dengan path ke dataset Anda
+    dataset_path = './dataset'
     load_known_faces(dataset_path)
 
     # Inisialisasi video capture
@@ -68,11 +68,8 @@ def faceRecognition():
                     cv2.rectangle(frame, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
                     cv2.putText(frame, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
                 
+
                     if name not in face_names:
                         face_names.append(name)
-        
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
 
     cam.release()
-    cv2.destroyAllWindows()
