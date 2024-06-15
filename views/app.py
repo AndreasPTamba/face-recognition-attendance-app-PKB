@@ -344,6 +344,7 @@ class MyApp:
                     self.save_student()
                     self.add_student_window.destroy()
                     self.root.deiconify()
+                    self.update_camera()
                     
                     
                     
@@ -357,9 +358,11 @@ class MyApp:
         
     def cancel_add_student(self):
         # Fungsi untuk membatalkan penambahan data
+        self.cam = cv2.VideoCapture(0)
         self.add_student_window.destroy()
         self.root.deiconify()
-        self.cam = cv2.VideoCapture(0)
+        self.update_camera()
+        
         
         
 
