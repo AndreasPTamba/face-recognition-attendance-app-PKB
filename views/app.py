@@ -9,6 +9,10 @@ from tkinter import messagebox
 from dotenv import load_dotenv
 import os
 from controllers.VideoCapture import addName
+from controllers.FaceRecognition import load_known_faces
+import face_recognition
+import numpy as np
+from datetime import datetime
 
 class MyApp:
     def __init__(self, root):
@@ -47,7 +51,12 @@ class MyApp:
         # button3 = tk.Button(root, text="Admin", width=30, height=2)
         # button3.place(x=(15 * self.padx), y=(5 * self.pady))
         
-        self.cap = cv2.VideoCapture(0)  # Open the camera
+        self.cam = cv2.VideoCapture(0)  # Open the camera
+        self.known_face_encodings = []
+        self.known_face_names = []
+        # Load known faces from the dataset
+        dataset_path = './dataset'
+        load_known_faces(dataset_path, self.known_face_encodings, self.known_face_names)
 
         # Update canvas with video feed
         self.update_camera()
@@ -58,11 +67,71 @@ class MyApp:
         # Connect to MySQL database
         self.connect_to_db()
         
-    def update_camera(self):
-        ret, frame = self.cap.read()  # Read frame from the camera
-
+    def update_camera(self): 
+        ret, frame = self.cam.read()
         if ret:
-            # Convert OpenCV BGR format to RGB format compatible with Tkinter
+            # Mengubah frame dari BGR (OpenCV format) ke RGB (face_recognition format)
+            imgS = cv2.resize(frame, (0, 0), None, 0.25, 0.25)
+            rgb_frame = cv2.cvtColor(imgS, cv2.COLOR_BGR2RGB)
+
+            # Deteksi wajah dalam frame
+            face_locations = face_recognition.face_locations(rgb_frame)
+
+            # Debug statement untuk memeriksa face_locations
+            print(f"Face locations: {face_locations}")
+
+            if face_locations:
+                face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+
+                # Debug statement untuk memeriksa face_encodings
+                print(f"Face encodings: {face_encodings}")
+
+                face_names = []
+                for face_encoding, face_location in zip(face_encodings, face_locations):
+                    matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding)
+                    name = "Unknown"
+
+                    face_distances = face_recognition.face_distance(self.known_face_encodings, face_encoding)
+                    best_match_index = np.argmin(face_distances)
+                    if matches[best_match_index]:
+                        name = self.known_face_names[best_match_index].upper()
+                        y1, x2, y2, x1 = face_location
+                        y1, x2, y2, x1 = y1*4, x2*4, y2*4, x1*4
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        cv2.rectangle(frame, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
+                        cv2.putText(frame, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
+                    
+
+                        if name not in face_names:
+                            face_names.append(name)
+                        
+
+                        db_connection = self.connect_to_db()
+                        if db_connection:
+                            cursor = db_connection.cursor()
+
+                            # Get current date in YYYY-MM-DD format
+                            current_date = datetime.now().strftime('%Y-%m-%d')
+
+                            try:
+                                query = "SELECT user_id FROM attendance_records WHERE attendance_date = %s AND user_id = %s"
+                                cursor.execute(query, (current_date, name))
+                                result = cursor.fetchall()
+
+                                if not result:
+                                    query = "INSERT INTO attendance_records (user_id, attendance_date, attendance_time, attendance_status) VALUES (%s, %s, %s, %s)"
+                                    data = (name, current_date, datetime.now().strftime('%H:%M:%S'), 'Present')
+                                    cursor.execute(query, data)
+                                    db_connection.commit()
+                                    print("Data inserted successfully")
+
+                            except mysql.connector.Error as error:
+                                print("Failed to fetch data from MySQL table:", error)
+                            finally:
+                                cursor.close()
+                                db_connection.close()
+                                print("MySQL connection is closed")
+
             rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
             # Resize image to fit canvas
@@ -75,8 +144,8 @@ class MyApp:
             self.frame1.create_image(0, 0, anchor=tk.NW, image=img)
             self.frame1.image = img  # Keep reference to prevent garbage collection
 
-        # Schedule the next update in 10 milliseconds
-        self.root.after(10, self.update_camera)
+            # Schedule the next update in 10 milliseconds
+            self.root.after(10, self.update_camera)
         
     def view_record(self):
         # Fungsi untuk menampilkan tabel data
@@ -157,7 +226,7 @@ class MyApp:
 
         # Hentikan pembaruan kamera
         self.root.after_cancel(self.update_camera)
-        
+
         # Buat jendela tambahan
         self.add_student_window = tk.Toplevel(self.root)
         self.add_student_window.title("Add Student")
@@ -178,7 +247,7 @@ class MyApp:
         
         # Sembunyikan jendela utama
         self.root.withdraw()
-        self.cap.release()
+        self.cam.release()
 
         # Buat label dan entry untuk NIM
         label_nim = tk.Label(self.add_student_window, text="NIM")
@@ -271,10 +340,11 @@ class MyApp:
                     messagebox.showinfo("Warning", f"NIM {nim} exists in the database.")
                 else:
                     addName(nim)
-                    self.cap = cv2.VideoCapture(0)
+                    self.cam = cv2.VideoCapture(0)
                     self.save_student()
                     self.add_student_window.destroy()
                     self.root.deiconify()
+                    self.update_camera()
                     
                     
                     
@@ -288,9 +358,11 @@ class MyApp:
         
     def cancel_add_student(self):
         # Fungsi untuk membatalkan penambahan data
+        self.cam = cv2.VideoCapture(0)
         self.add_student_window.destroy()
         self.root.deiconify()
-        self.cap = cv2.VideoCapture(0)
+        self.update_camera()
+        
         
         
 
