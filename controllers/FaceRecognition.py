@@ -44,14 +44,8 @@ def faceRecognition():
         # Deteksi wajah dalam frame
         face_locations = face_recognition.face_locations(rgb_frame)
 
-        # Debug statement untuk memeriksa face_locations
-        print(f"Face locations: {face_locations}")
-
         if face_locations:
             face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
-
-            # Debug statement untuk memeriksa face_encodings
-            print(f"Face encodings: {face_encodings}")
 
             face_names = []
             for face_encoding, face_location in zip(face_encodings, face_locations):
@@ -60,16 +54,20 @@ def faceRecognition():
 
                 face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
                 best_match_index = np.argmin(face_distances)
-                if matches[best_match_index]:
-                    name = known_face_names[best_match_index].upper()
-                    y1, x2, y2, x1 = face_location
-                    y1, x2, y2, x1 = y1*4, x2*4, y2*4, x1*4
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.rectangle(frame, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
-                    cv2.putText(frame, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
-                
 
-                    if name not in face_names:
-                        face_names.append(name)
+                print(f"Face distances: {face_distances}")
+                # Menentukan kecocokan berdasarkan threshold
+                threshold = 0.1
+                if matches[best_match_index] and face_distances[best_match_index] < threshold:
+                    name = known_face_names[best_match_index].upper()
+
+                y1, x2, y2, x1 = face_location
+                y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.rectangle(frame, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
+                cv2.putText(frame, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
+
+                if name not in face_names:
+                    face_names.append(name)
 
     cam.release()

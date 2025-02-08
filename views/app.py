@@ -77,14 +77,9 @@ class MyApp:
             # Deteksi wajah dalam frame
             face_locations = face_recognition.face_locations(rgb_frame)
 
-            # Debug statement untuk memeriksa face_locations
-            print(f"Face locations: {face_locations}")
-
             if face_locations:
                 face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
 
-                # Debug statement untuk memeriksa face_encodings
-                print(f"Face encodings: {face_encodings}")
 
                 face_names = []
                 for face_encoding, face_location in zip(face_encodings, face_locations):
@@ -93,17 +88,21 @@ class MyApp:
 
                     face_distances = face_recognition.face_distance(self.known_face_encodings, face_encoding)
                     best_match_index = np.argmin(face_distances)
-                    if matches[best_match_index]:
-                        name = self.known_face_names[best_match_index].upper()
-                        y1, x2, y2, x1 = face_location
-                        y1, x2, y2, x1 = y1*4, x2*4, y2*4, x1*4
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                        cv2.rectangle(frame, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
-                        cv2.putText(frame, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
                     
+                    print(f"Face distances: {face_distances}")
+                    threshold = 0.46
+                    if matches[best_match_index] and face_distances[best_match_index] < threshold:
+                        name = self.known_face_names[best_match_index].upper()
 
-                        if name not in face_names:
-                            face_names.append(name)
+                    y1, x2, y2, x1 = face_location
+                    y1, x2, y2, x1 = y1*4, x2*4, y2*4, x1*4
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.rectangle(frame, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
+                    cv2.putText(frame, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255), 2)
+                
+
+                    if name not in face_names:
+                        face_names.append(name)
                         
 
                         db_connection = self.connect_to_db()
@@ -112,13 +111,15 @@ class MyApp:
 
                             # Get current date in YYYY-MM-DD format
                             current_date = datetime.now().strftime('%Y-%m-%d')
-
+                            result = None
+                            
                             try:
-                                query = "SELECT user_id FROM attendance_records WHERE attendance_date = %s AND user_id = %s"
-                                cursor.execute(query, (current_date, name))
-                                result = cursor.fetchall()
+                                if name != "Unknown":
+                                    query = "SELECT user_id FROM attendance_records WHERE attendance_date = %s AND user_id = %s"
+                                    cursor.execute(query, (current_date, name))
+                                    result = cursor.fetchall()
 
-                                if not result:
+                                if not result and name != "Unknown":
                                     query = "INSERT INTO attendance_records (user_id, attendance_date, attendance_time, attendance_status) VALUES (%s, %s, %s, %s)"
                                     data = (name, current_date, datetime.now().strftime('%H:%M:%S'), 'Present')
                                     cursor.execute(query, data)
@@ -211,7 +212,7 @@ class MyApp:
             query = """
                 SELECT m.nim, m.name, a.attendance_date, a.attendance_time, a.attendance_status
                 FROM mahasiswa m
-                LEFT JOIN attendance_records a ON m.nim = a.user_id
+                RIGHT JOIN attendance_records a ON m.nim = a.user_id
             """
             cursor.execute(query)
             rows = cursor.fetchall()
